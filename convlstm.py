@@ -7,10 +7,10 @@ from utils import ConvNorm
 #TODO: mampu menangani PackedSequence
 class ConvLstmCell(torch.nn.Module):
     def __init__(self, hidden_dim, batch_first=True, w_init_gain='linear'):
+        super(ConvLstmCell, self).__init__()
          # self.input_size = input_dim
         # self.batch_size = batch_size
         self.hidden_size = hidden_dim
-        self.num_layers = num_layers
         self.batch_first = batch_first
 
         self.W_i = torch.nn.Parameter(torch.randn(self.hidden_size, 1))
@@ -27,6 +27,9 @@ class ConvLstmCell(torch.nn.Module):
         pass
 
     def convlstm_full(self, timestep, prev_hidden, prev_cell, input_size):
+        htm1 = prev_hidden
+        ctm1 = prev_cell
+
         #expand num of weights to batch size
         W_i = self.W_i.expand(self.hidden_size, input_size)
         W_f = self.W_f.expand(self.hidden_size, input_size)
@@ -56,11 +59,11 @@ class ConvLstmCell(torch.nn.Module):
 
         return ht, ct
 
-    def forward(self, x, prev_states, input_size):
-        if is_packed:
-            convlstm_packed()
-        else:
-            result = convlstm_full(x, prev_states[0], prev_states[1], input_size)
+    def forward(self, x, prev_hidden, prev_cell, input_size):
+        #if is_packed:
+        #    convlstm_packed()
+        #else:
+        result = self.convlstm_full(x, prev_hidden, prev_cell, input_size)
 
         return result
 
@@ -75,10 +78,10 @@ class ConvLstm(torch.nn.Module):
         self.batch_first = batch_first
 
         layers = []
-        for i in range(num_layers):
+        for i in range(self.num_layers):
             layers.append(ConvLstmCell(self.hidden_size, self.batch_first))
         
-        self.layers = nn.ModuleList(layers)
+        self.layers = torch.nn.ModuleList(layers)
 
     def conv_lstm_cell(self, input_, initial_hidden, initial_cell):
         input_size = input_.size(0)
@@ -193,14 +196,14 @@ class ConvLstm(torch.nn.Module):
         return output, (ht, ct)
 
 if __name__ == '__main__':
-    convlstm = ConvLstm(256)
+    convlstm = ConvLstm(256, num_layers=3)
     x = torch.ones([12, 10, 256])
     initial_h = torch.zeros([256, 12])
     initial_c = torch.zeros([256, 12])
     y, _ = convlstm(x, [initial_h, initial_c])
     print(y.size())
     test_data = torch.ones([1, 10, 256])
-    initial_h_test = torch.zeros([1, 256])
-    initial_c_test = torch.zeros([1, 256])
+    initial_h_test = torch.zeros([256, 1])
+    initial_c_test = torch.zeros([256, 1])
     inference, _ = convlstm(test_data, [initial_h_test, initial_c_test])
     print(inference.size())
