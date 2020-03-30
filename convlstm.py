@@ -2,8 +2,6 @@ import torch
 from torch.nn.utils.rnn import PackedSequence
 from utils import ConvNorm
 
-#TODO: bikin multilayer
-#TODO: fixing input yang tidak batch first
 #TODO: mampu menangani PackedSequence
 class ConvLstmCell(torch.nn.Module):
     def __init__(self, hidden_dim, batch_first=True, w_init_gain='linear'):
@@ -161,21 +159,48 @@ class ConvLstm(torch.nn.Module):
 
         # self.check_forward_args(x, hx, batch_sizes)
         if batch_sizes is None:
-            batch_size = x.size(0)
-            current_layer_input = x.permute(1, 2, 0) # (seq_len, hidden_size, batch)
+            if batch_first:
+                current_layer_input = x.permute(1, 2, 0) # (seq_len, hidden_size, batch)
+            else:
+                current_layer_input = x.permute(0, 2, 1) # (seq_len, hidden_size, batch)
 
             for layers in self.layers:
                 htm1 = initials[0] #ht-1
                 ctm1 = initials[1] #ct-1
                 hiddens = []
                 for timestep in current_layer_input:
-                    ht, ct = layers(timestep, htm1, ctm1, batch_size)
+                    ht, ct = layer(timestep, htm1, ctm1, max_batch_size)
                     hiddens.append(ht.unsqueeze(0)) # (1, hidden_size, batch_size)
 
                     htm1, ctm1 = ht, ct
                 
                 current_layer_input = torch.cat(hiddens, dim=0)
+        else:
+            current_layer_input = x
 
+            for layer in self.layers:
+                last_batch_size = max_batch_size
+                data_offset = 0
+                htm1 = initials[0]
+                ctm1 = initials[0]
+                hiddens = []
+                for batch_size in batch_sizes:
+                    delta = last_batch_size - batch_size
+                    if delta > 0:
+                        htm1 = htm1.narrow(1, 0, batch_size + 1)
+                        ctm1 = ctm1.narrow(1, 0, batch_size + 1)
+                    
+                    last_batch_size = batch_size
+                    timestep = x.narrow(0, data_offset, batch_size + 1)
+
+                    ht, ct = layer(timestep, htm1, ctm1, batch_size)
+
+                    hiddens.append(ht)
+
+                    data_offset = data_offset + batch_size
+                    htm1, ctm1 = ht, ct
+                
+                current_layer_input = torch.cat(hiddens, dim=1).permute(1, 0)
         #     for i in range(x.size(0)):
         #         hx, cx = conv_lstm_cell(x[i], hx, cx, w_ih, w_hh, b_ih, b_hh)
         # else:
@@ -192,7 +217,7 @@ class ConvLstm(torch.nn.Module):
         if self.batch_first:
             output = current_layer_input.permute(2, 0, 1) # (batch, seq_len, hidden_size)
         else:
-            output = current_layer_input
+            output = current_layer_input.permute(0, 2, 1) # (seq_len, batch, hidden_size)
         return output, (ht, ct)
 
 if __name__ == '__main__':
