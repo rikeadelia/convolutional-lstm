@@ -76,7 +76,7 @@ class ConvLstm(torch.nn.Module):
 
         layers = []
         for i in range(num_layers):
-            layers.append(ConvLstmCell(self.hidden_dim, self.batch_first))
+            layers.append(ConvLstmCell(self.hidden_size, self.batch_first))
         
         self.layers = nn.ModuleList(layers)
 
