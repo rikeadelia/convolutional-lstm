@@ -24,7 +24,7 @@ class ConvLstmCell(torch.nn.Module):
         self.b_o = torch.nn.Parameter(torch.randn(self.hidden_size, 1))
 
     def convlstm_packed():
-        #pass
+        pass
 
     def convlstm_full(self, timestep, prev_hidden, prev_cell, input_size):
         #expand num of weights to batch size
